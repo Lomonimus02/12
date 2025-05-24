@@ -41,9 +41,12 @@ export function MainLayout({ children, className }: MainLayoutProps) {
         
         {/* Main Content */}
         <main 
-          className={`flex-1 bg-gray-50 p-4 transition-all duration-300
+          className={`relative isolate flex-1 p-4 transition-all duration-300 
+            bg-slate-100 
+            before:absolute before:inset-0 before:-z-10 before:content-[''] before:bg-[radial-gradient(ellipse_at_top_center,_var(--tw-gradient-stops))] before:from-sky-300/25 before:via-sky-200/10 before:to-slate-100/0
+            after:absolute after:inset-0 after:-z-10 after:content-[''] after:bg-gradient-to-tl after:from-purple-200/20 after:via-transparent after:to-transparent
             ${!sidebarOpen ? 'md:w-full' : ''} 
-            ${className || 'overflow-auto'}`}
+            ${className || 'overflow-auto'}`} // className prop from page will be merged here
         >
           <div className="h-full">
             {children}

@@ -1,5 +1,5 @@
 // client/src/pages/subjects-management.tsx
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react"; // Added useCallback
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useRoleCheck } from "@/hooks/use-role-check";
@@ -8,14 +8,16 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Subject, Subgroup, Class, InsertSubgroup, InsertSubject, School, Schedule } from "@shared/schema";
 import { Button } from "@/components/ui/button";
-import { Plus, BookOpen, Users, Loader2, Filter, ArrowLeft } from "lucide-react";
+import { Input } from "@/components/ui/input"; // Added Input import
+import { Plus, BookOpen, Users, Loader2, Filter, ArrowLeft, Inbox, ListX } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"; // Added Tooltip components
 import { SubjectSubgroupCard, SubjectSubgroupItem } from "@/components/subjects-management/subject-subgroup-card";
 import { SubjectFormDialog } from "@/components/subjects-management/subject-form-dialog";
 import { SubgroupFormDialog } from "@/components/subjects-management/subgroup-form-dialog";
-import { ClassCard } from "@/components/subjects-management/class-card"; // Импортируем новую карточку
-import { useLocation } from "wouter"; // Импортируем для навигации
+import { ClassCard } from "@/components/subjects-management/class-card";
+import { useLocation } from "wouter";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function SubjectsManagementPage() {
@@ -36,21 +38,18 @@ export default function SubjectsManagementPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [itemToEdit, setItemToEdit] = useState<SubjectSubgroupItem | null>(null);
 
-  // *** DEBUG: Track original values
-  const [lastEditedSubject, setLastEditedSubject] = useState<any>(null);
-
-  // Определяем ID школы администратора
+  // --- School ID ---
   const schoolId = user?.schoolId || null;
 
-  // Fetch subjects for the school
+  // --- Data Fetching Queries ---
   const { data: subjects = [], isLoading: subjectsLoading } = useQuery<Subject[]>({
     queryKey: ["/api/subjects", schoolId],
     queryFn: async () => {
       if (!schoolId) return [];
-      console.log("*** DEBUG: Fetching subjects with schoolId:", schoolId);
+      // console.log("*** DEBUG: Fetching subjects with schoolId:", schoolId);
       const res = await apiRequest(`/api/subjects?schoolId=${schoolId}`);
       const data = await res.json();
-      console.log("*** DEBUG: Fetched subjects data:", data);
+      // console.log("*** DEBUG: Fetched subjects data:", data);
       return data;
     },
     enabled: !!schoolId && isAdmin(),
@@ -89,14 +88,12 @@ export default function SubjectsManagementPage() {
     enabled: !!schoolId && isAdmin(),
   });
 
-  // Объединяем предметы и подгруппы в один массив для отображения
+  // --- Memoized Data ---
   const combinedItems = useMemo(() => {
-    // --- DEBUG LOG --- 
-    console.log('Recalculating combinedItems. Subjects:', subjects, 'Subgroups:', subgroups);
-    // --- END DEBUG LOG ---
+    // console.log('Recalculating combinedItems. Subjects:', subjects, 'Subgroups:', subgroups);
     const items: SubjectSubgroupItem[] = [
       ...subjects,
-      ...subgroups.map(sg => ({ ...sg, isSubgroup: true }))
+      ...subgroups.map(sg => ({ ...sg, isSubgroup: true })),
     ];
 
     const filtered = selectedClassFilter === "all"
@@ -118,7 +115,7 @@ export default function SubjectsManagementPage() {
 
   const isLoading = subjectsLoading || subgroupsLoading || classesLoading || schedulesLoading;
 
-  // --- Мутации для добавления --- (остаются без изменений)
+  // --- Mutation Operations ---
   const createSubjectMutation = useMutation({
     mutationFn: (data: Omit<InsertSubject, 'schoolId'> & { schoolId: number }) =>
       apiRequest('/api/subjects', 'POST', data),
@@ -127,7 +124,7 @@ export default function SubjectsManagementPage() {
       setIsSubjectDialogOpen(false);
       toast({ title: "Предмет успешно создан" });
     },
-    onError: (error: any) => toast({ title: "Ошибка", description: error.message, variant: "destructive" })
+    onError: (error: any) => toast({ title: "Ошибка создания предмета", description: error.message, variant: "destructive" })
   });
 
   const createSubgroupMutation = useMutation({
@@ -138,14 +135,14 @@ export default function SubjectsManagementPage() {
       setIsSubgroupDialogOpen(false);
       toast({ title: "Подгруппа успешно создана" });
     },
-    onError: (error: any) => toast({ title: "Ошибка", description: error.message, variant: "destructive" })
+    onError: (error: any) => toast({ title: "Ошибка создания подгруппы", description: error.message, variant: "destructive" })
   });
 
   const handleCreateSubject = (data: Omit<InsertSubject, 'schoolId'>) => {
     if (schoolId) {
       createSubjectMutation.mutate({ ...data, schoolId });
     } else {
-      toast({ title: "Ошибка", description: "Не удалось определить ID школы", variant: "destructive" });
+      toast({ title: "Ошибка конфигурации", description: "Не удалось определить ID школы для создания предмета.", variant: "destructive" });
     }
   };
 
@@ -153,12 +150,12 @@ export default function SubjectsManagementPage() {
     if (schoolId) {
       createSubgroupMutation.mutate({ ...data, schoolId });
     } else {
-      toast({ title: "Ошибка", description: "Не удалось определить ID школы", variant: "destructive" });
+      toast({ title: "Ошибка конфигурации", description: "Не удалось определить ID школы для создания подгруппы.", variant: "destructive" });
     }
   };
 
-  // --- Обработчики для карточек ---
-  const handleCardClick = async (item: SubjectSubgroupItem) => {
+  // --- Event Handlers ---
+  const handleCardClick = useCallback(async (item: SubjectSubgroupItem) => {
     setIsLoadingRelatedClasses(true);
     setSelectedItem(item);
     setRelatedClasses([]); // Очищаем предыдущие классы
@@ -183,9 +180,9 @@ export default function SubjectsManagementPage() {
 
     setRelatedClasses(relatedClassData);
     setIsLoadingRelatedClasses(false);
-  };
+  }, [schedules, classes]); // Added dependencies: schedules, classes
 
-  const handleClassCardClick = (classData: Class) => {
+  const handleClassCardClick = useCallback((classData: Class) => {
     if (!selectedItem) return;
 
     const isSubgroup = 'isSubgroup' in selectedItem;
@@ -199,27 +196,27 @@ export default function SubjectsManagementPage() {
       if (scheduleWithSubgroup) {
         finalSubjectId = scheduleWithSubgroup.subjectId;
       } else {
-        toast({ title: "Ошибка", description: "Не удалось найти предмет для этой подгруппы в расписании.", variant: "destructive" });
+        toast({ title: "Ошибка навигации", description: "Не удалось найти связанный предмет для этой подгруппы в расписании.", variant: "destructive" });
         return;
       }
     }
 
     if (finalSubjectId === null) {
-      toast({ title: "Ошибка", description: "Не удалось определить предмет.", variant: "destructive" });
+      toast({ title: "Ошибка навигации", description: "Не удалось определить предмет для перехода к журналу.", variant: "destructive" });
       return;
     }
 
     // Формируем URL для перехода к журналу
     const url = `/class-grade-details/${classData.id}/${finalSubjectId}${subgroupId ? `/${subgroupId}` : ''}`;
     navigate(url);
-  };
+  }, [selectedItem, schedules, navigate, toast]); // Added dependencies: selectedItem, schedules, navigate, toast
 
-  const handleBackClick = () => {
+  const handleBackClick = useCallback(() => {
     setSelectedItem(null);
     setRelatedClasses([]);
-  };
+  }, []);
 
-  // --- МУТАЦИИ ДЛЯ УДАЛЕНИЯ ---
+  // --- Mutations (Delete, Edit - continued) ---
   const deleteSubjectMutation = useMutation({
     mutationFn: (id: number) => apiRequest(`/api/subjects/${id}`, 'DELETE'),
     onSuccess: () => {
@@ -228,7 +225,7 @@ export default function SubjectsManagementPage() {
       setItemToDelete(null);
       toast({ title: "Предмет удалён" });
     },
-    onError: (error: any) => toast({ title: "Ошибка", description: error.message, variant: "destructive" })
+    onError: (error: any) => toast({ title: "Ошибка удаления предмета", description: error.message, variant: "destructive" })
   });
   const deleteSubgroupMutation = useMutation({
     mutationFn: (id: number) => apiRequest(`/api/subgroups/${id}`, 'DELETE'),
@@ -238,66 +235,38 @@ export default function SubjectsManagementPage() {
       setItemToDelete(null);
       toast({ title: "Подгруппа удалена" });
     },
-    onError: (error: any) => toast({ title: "Ошибка", description: error.message, variant: "destructive" })
+    onError: (error: any) => toast({ title: "Ошибка удаления подгруппы", description: error.message, variant: "destructive" })
   });
 
   // --- МУТАЦИИ ДЛЯ РЕДАКТИРОВАНИЯ ---
   const editSubjectMutation = useMutation({
     mutationFn: async (data: { id: number, values: Partial<InsertSubject> }) => {
-      // Keep logging for now
-      console.log("*** DEBUG: Starting subject edit mutation with data:", data);
+      // console.log("*** DEBUG: Starting subject edit mutation with data:", data);
       const result = await apiRequest(`/api/subjects/${data.id}`, 'PATCH', data.values);
-      console.log("*** DEBUG: PATCH request complete, result status:", result.status);
-      // Ensure the response body is consumed, even if not used, to prevent issues
-      await result.text(); 
-      // Check if the request was successful before proceeding
+      // console.log("*** DEBUG: PATCH request complete, result status:", result.status);
+      await result.text();
       if (!result.ok) {
         throw new Error(await result.text() || `Failed to update subject ${data.id}`);
       }
-      return result; // Or potentially return parsed JSON if needed elsewhere
+      return result;
     },
-    onSuccess: (data, variables) => { // variables contains the input data { id, values }
-      console.log('*** DEBUG: Edit subject mutation succeeded for ID:', variables.id);
-
-      // 1. Invalidate the query for the subjects list
-      // This tells React Query that the data for this key is stale
-      // It will automatically refetch in the background.
+    onSuccess: (data, variables) => {
+      // console.log('*** DEBUG: Edit subject mutation succeeded for ID:', variables.id);
       queryClient.invalidateQueries({ queryKey: ['/api/subjects', schoolId] });
-
-      // 2. Close the edit dialog
       setIsEditDialogOpen(false);
       setItemToEdit(null);
-
-      // 3. Show success toast
       toast({ title: "Предмет успешно обновлён" });
-
-      // Remove all previous manual fetching, cache clearing, and reloading logic
-      /*
-      toast({ 
-        title: "Запрос на изменение отправлен успешно", 
-        description: `Запрошено изменение ...` 
-      });
-      setTimeout(async () => { ... }, 3000);
-      queryClient.clear();
-      if (schoolId) { ... }
-      setTimeout(() => { window.location.reload(); }, 2000);
-      */
     },
     onError: (error: any, variables) => {
-      console.error(`*** DEBUG: Edit subject mutation error for ID ${variables.id}:`, error);
+      // console.error(`*** DEBUG: Edit subject mutation error for ID ${variables.id}:`, error);
       toast({ title: "Ошибка обновления предмета", description: error.message, variant: "destructive" });
-      // Consider keeping the dialog open on error?
-      // setIsEditDialogOpen(false);
-      // setItemToEdit(null);
     }
   });
   const editSubgroupMutation = useMutation({
     mutationFn: async (data: { id: number, values: Partial<InsertSubgroup> }) => {
-      // Add similar logging and error handling as editSubjectMutation
-      console.log("*** DEBUG: Starting subgroup edit mutation with data:", data);
+      // console.log("*** DEBUG: Starting subgroup edit mutation with data:", data);
       const result = await apiRequest(`/api/subgroups/${data.id}`, 'PATCH', data.values);
-      console.log("*** DEBUG: Subgroup PATCH request complete, result status:", result.status);
-      // Ensure body is consumed
+      // console.log("*** DEBUG: Subgroup PATCH request complete, result status:", result.status);
       await result.text();
       if (!result.ok) {
          throw new Error(await result.text() || `Failed to update subgroup ${data.id}`);
@@ -305,113 +274,156 @@ export default function SubjectsManagementPage() {
       return result;
     },
     onSuccess: (data, variables) => {
-      console.log('*** DEBUG: Edit subgroup mutation succeeded for ID:', variables.id);
-      
-      // 1. Invalidate the query for the subgroups list
+      // console.log('*** DEBUG: Edit subgroup mutation succeeded for ID:', variables.id);
+      // It will automatically refetch in the background.
       queryClient.invalidateQueries({ queryKey: ['/api/subgroups', schoolId] });
-
-      // Optionally, invalidate other queries if subgroup changes might affect them
-      // (e.g., if combinedItems calculation depends on fresh subgroup data immediately)
-      // queryClient.invalidateQueries({ queryKey: ['/api/subjects', schoolId] });
-      
-      // 2. Close the edit dialog
       setIsEditDialogOpen(false);
       setItemToEdit(null);
-
-      // 3. Show success toast
       toast({ title: "Подгруппа успешно обновлена" });
-
-      // Remove all previous manual fetching, cache clearing, and reloading logic
-      /*
-      queryClient.clear();
-      if (schoolId) { ... }
-      window.location.reload();
-      */
     },
     onError: (error: any, variables) => {
-       console.error(`*** DEBUG: Edit subgroup mutation error for ID ${variables.id}:`, error);
+      // console.error(`*** DEBUG: Edit subgroup mutation error for ID ${variables.id}:`, error);
       toast({ title: "Ошибка обновления подгруппы", description: error.message, variant: "destructive" });
     }
   });
 
-  // --- ОБРАБОТЧИКИ ---
-  const handleEditItem = (item: SubjectSubgroupItem) => {
-    // Open dialog immediately, student fetching will happen inside the dialog
-    setItemToEdit(item); // Pass the item as is (studentIds might be missing)
+  // --- Dialog Control Handlers ---
+  const openCreateSubjectDialog = useCallback(() => setIsSubjectDialogOpen(true), []);
+  const closeCreateSubjectDialog = useCallback(() => setIsSubjectDialogOpen(false), []);
+  const openCreateSubgroupDialog = useCallback(() => setIsSubgroupDialogOpen(true), []);
+  const closeCreateSubgroupDialog = useCallback(() => setIsSubgroupDialogOpen(false), []);
+
+  const openEditDialog = useCallback((item: SubjectSubgroupItem) => {
+    setItemToEdit(item);
     setIsEditDialogOpen(true);
-  };
-  const handleDeleteItem = (item: SubjectSubgroupItem) => {
+  }, []);
+  const closeEditDialog = useCallback(() => {
+    setIsEditDialogOpen(false);
+    setItemToEdit(null);
+  }, []);
+
+  const openDeleteDialog = useCallback((item: SubjectSubgroupItem) => {
     setItemToDelete(item);
     setIsDeleteDialogOpen(true);
-  };
+  }, []);
+  const closeDeleteDialog = useCallback(() => {
+    setIsDeleteDialogOpen(false);
+    setItemToDelete(null);
+  }, []);
 
+
+  // --- Render Logic ---
   return (
-    <MainLayout>
-      <div className="container mx-auto py-6">
-        {selectedItem ? (
-          // Отображение классов для выбранного предмета/подгруппы
-          <div>
-            <Button variant="outline" onClick={handleBackClick} className="mb-6">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Назад к списку
-            </Button>
-            <h1 className="text-3xl font-bold mb-2">
-              Классы для: {selectedItem.name}
-            </h1>
-            <p className="text-muted-foreground mb-6">
-              {'isSubgroup' in selectedItem ? `Подгруппа класса ${classes.find(c => c.id === selectedItem.classId)?.name}` : "Предмет"}
-            </p>
+    <MainLayout> {/* Background is now globally set in MainLayout component */}
+      <TooltipProvider delayDuration={300}>
+        <div className="container mx-auto py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden"> {/* Added relative and overflow-hidden for positioning context */}
+          
+          {/* View: Related Classes for a Selected Item - This view will animate in from the right */}
+          <div 
+            className={`transition-all duration-300 ease-out 
+                        ${selectedItem 
+                          ? 'opacity-100 translate-x-0 scale-100 delay-100 pointer-events-auto' 
+                          : 'opacity-0 translate-x-6 scale-95 pointer-events-none absolute top-0 left-0 w-full invisible'}`}
+          >
+            {selectedItem && ( // Conditional rendering to ensure data is present before trying to render
+              <>
+                <Button 
+                  onClick={handleBackClick} 
+                  className="mb-6 inline-flex items-center justify-center rounded-full px-6 py-3 text-base font-medium bg-white/15 backdrop-filter backdrop-blur-lg text-slate-800 shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.45),inset_0_1px_2px_rgba(0,0,0,0.05),0_15px_30px_-8px_rgba(0,0,0,0.08),_0_8px_20px_-12px_rgba(0,0,0,0.05)] hover:bg-white/25 hover:shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.55),inset_0_1px_2px_rgba(0,0,0,0.08),0_18px_35px_-8px_rgba(0,0,0,0.1),0_10px_25px_-12px_rgba(0,0,0,0.07)] hover:-translate-y-px active:scale-[0.98] active:bg-white/20 active:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.3),inset_0_1px_3px_rgba(0,0,0,0.1)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 transition-all duration-200 ease-in-out"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Назад к списку {/* Back to list */}
+                </Button>
+                <h1 className="text-3xl font-bold mb-2">
+                  Классы для: {selectedItem.name}
+                </h1>
+                <p className="text-muted-foreground mb-6">
+                  {'isSubgroup' in selectedItem ? `Подгруппа класса ${classes.find(c => c.id === selectedItem.classId)?.name}` : "Предмет"}
+                </p>
 
-            {isLoadingRelatedClasses ? (
-              <div className="flex justify-center items-center h-64">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            ) : relatedClasses.length === 0 ? (
-              <Card>
-                <CardContent className="pt-6 text-center text-muted-foreground">
-                  Нет классов, использующих { 'isSubgroup' in selectedItem ? 'эту подгруппу' : 'этот предмет'}.
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {relatedClasses.map((cls) => (
-                  <ClassCard
-                    key={cls.id}
-                    classData={cls}
-                    onClick={handleClassCardClick}
-                  />
-                ))}
-              </div>
+                {isLoadingRelatedClasses ? (
+                  <div className="flex flex-col justify-center items-center h-64 text-muted-foreground">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary mb-3" />
+                    <p className="text-sm text-slate-600">Загрузка классов...</p>
+                  </div>
+                ) : relatedClasses.length === 0 ? (
+                  <Card className="bg-white/30 backdrop-filter backdrop-blur-xl rounded-2xl shadow-lg border border-white/20">
+                    <CardContent className="pt-10 pb-10 text-center bg-transparent">
+                      <ListX className="h-16 w-16 text-slate-500 mx-auto mb-6" />
+                      <p className="text-xl font-semibold text-slate-700">
+                        Нет связанных классов
+                      </p>
+                      <p className="text-sm text-slate-500 mt-2">
+                        Для "{selectedItem.name}" ({'isSubgroup' in selectedItem ? 'подгруппы' : 'предмета'}) не найдено использующих его классов.
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                    {relatedClasses.map((cls) => (
+                      <Tooltip key={cls.id}>
+                        <TooltipTrigger className="h-full w-full">
+                          <ClassCard
+                            classData={cls}
+                            onClick={handleClassCardClick}
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Перейти к журналу класса</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
-        ) : (
-          // Отображение списка предметов и подгрупп
-          <div>
+
+          {/* View: Main List of Subjects and Subgroups - This view will animate in from the left (or be initial state) */}
+          <div 
+            className={`transition-all duration-300 ease-out 
+                        ${!selectedItem 
+                          ? 'opacity-100 translate-x-0 scale-100 delay-100 pointer-events-auto' 
+                          : 'opacity-0 -translate-x-6 scale-95 pointer-events-none absolute top-0 left-0 w-full invisible'}`}
+          >
+            {/* This content is always rendered if selectedItem is null, or during its exit animation */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
               <h1 className="text-3xl font-bold">Предметы и подгруппы</h1>
               <div className="flex gap-2 w-full sm:w-auto">
-                <Button onClick={() => setIsSubjectDialogOpen(true)} className="flex-1 sm:flex-none">
-                  <Plus className="h-4 w-4 mr-2" /> Добавить предмет
+                <Button 
+                  onClick={openCreateSubjectDialog} 
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center rounded-full px-6 py-3 text-base font-medium text-white bg-gradient-to-b from-blue-500/95 via-blue-600/90 to-blue-700/95 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),inset_0_0_0_1.5px_rgba(255,255,255,0.2),0_5px_15px_-3px_rgba(0,0,0,0.08),_0_8px_25px_-8px_rgba(0,0,0,0.07)] hover:from-blue-400/95 hover:via-blue-500/90 hover:to-blue-600/95 hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.5),inset_0_0_0_1.5px_rgba(255,255,255,0.3),0_6px_18px_-3px_rgba(0,0,0,0.1),0_10px_30px_-8px_rgba(0,0,0,0.09)] hover:-translate-y-px active:scale-[0.97] active:from-blue-600/95 active:via-blue-700/90 active:to-blue-800/95 active:shadow-[inset_0_1px_3px_rgba(0,0,0,0.25)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 transition-all duration-200 ease-in-out"
+                >
+                  <Plus className="h-4 w-4 mr-2" /> Добавить предмет {/* Add Subject */}
                 </Button>
-                <Button onClick={() => setIsSubgroupDialogOpen(true)} className="flex-1 sm:flex-none">
-                  <Plus className="h-4 w-4 mr-2" /> Добавить подгруппу
+                <Button 
+                  onClick={openCreateSubgroupDialog} 
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center rounded-full px-6 py-3 text-base font-medium text-white bg-gradient-to-b from-blue-500/95 via-blue-600/90 to-blue-700/95 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),inset_0_0_0_1.5px_rgba(255,255,255,0.2),0_5px_15px_-3px_rgba(0,0,0,0.08),_0_8px_25px_-8px_rgba(0,0,0,0.07)] hover:from-blue-400/95 hover:via-blue-500/90 hover:to-blue-600/95 hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.5),inset_0_0_0_1.5px_rgba(255,255,255,0.3),0_6px_18px_-3px_rgba(0,0,0,0.1),0_10px_30px_-8px_rgba(0,0,0,0.09)] hover:-translate-y-px active:scale-[0.97] active:from-blue-600/95 active:via-blue-700/90 active:to-blue-800/95 active:shadow-[inset_0_1px_3px_rgba(0,0,0,0.25)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 transition-all duration-200 ease-in-out"
+                >
+                  <Plus className="h-4 w-4 mr-2" /> Добавить подгруппу {/* Add Subgroup */}
                 </Button>
               </div>
             </div>
 
             <div className="mb-6">
               <Select value={selectedClassFilter} onValueChange={setSelectedClassFilter}>
-                <SelectTrigger className="w-[250px]">
-                  <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
+                <SelectTrigger 
+                  className="w-[250px] rounded-xl px-4 py-3 text-base font-medium bg-slate-100/20 backdrop-filter backdrop-blur-md border border-white/20 text-slate-900 placeholder:text-slate-500/90 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1),inset_0_-1px_2px_0_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/50 focus-visible:border-blue-500/70 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-100 transition-all duration-200 ease-in-out [&>svg]:text-slate-700"
+                >
+                  <Filter className="h-4 w-4 mr-2 text-muted-foreground" /> {/* This icon might need color adjustment if text-muted-foreground is too light now */}
                   <SelectValue placeholder="Фильтр по классу" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Все классы (для подгрупп)</SelectItem>
+                <SelectContent className="p-2 bg-slate-100/40 backdrop-filter backdrop-blur-xl rounded-2xl shadow-lg border border-white/20">
+                  <SelectItem value="all" className="text-slate-800 relative flex w-full cursor-default select-none items-center rounded-md py-2.5 pl-8 pr-3 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-blue-500/10 data-[highlighted]:text-accent-foreground focus:bg-blue-500/10 focus:text-accent-foreground">Все классы (для подгрупп)</SelectItem>
                   {classesLoading ? (
-                    <SelectItem value="loading" disabled>Загрузка классов...</SelectItem>
+                    <SelectItem value="loading" disabled className="text-slate-800 relative flex w-full cursor-default select-none items-center rounded-md py-2.5 pl-8 pr-3 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-blue-500/10 data-[highlighted]:text-accent-foreground focus:bg-blue-500/10 focus:text-accent-foreground">Загрузка классов...</SelectItem>
                   ) : (
                     classes.map((cls) => (
-                      <SelectItem key={cls.id} value={cls.id.toString()}>
+                      <SelectItem 
+                        key={cls.id} 
+                        value={cls.id.toString()}
+                        className="text-slate-800 relative flex w-full cursor-default select-none items-center rounded-md py-2.5 pl-8 pr-3 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-blue-500/10 data-[highlighted]:text-accent-foreground focus:bg-blue-500/10 focus:text-accent-foreground"
+                      >
                         {cls.name}
                       </SelectItem>
                     ))
@@ -421,65 +433,79 @@ export default function SubjectsManagementPage() {
             </div>
 
             {isLoading ? (
-              <div className="flex justify-center items-center h-64">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <div className="flex flex-col justify-center items-center h-64">
+                <Loader2 className="h-10 w-10 animate-spin text-blue-600 mb-3" /> {/* Ensured primary color for spinner */}
+                <p className="text-sm text-slate-600">Загрузка элементов...</p> {/* Ensured text color for new bg */}
               </div>
             ) : combinedItems.length === 0 ? (
-              <Card>
-                <CardContent className="pt-6 text-center text-muted-foreground">
-                  {selectedClassFilter === "all"
-                    ? "В вашей школе еще нет предметов или подгрупп."
-                    : "Для выбранного класса нет подгрупп."}
+              // Applying glassmorphism to empty state card for combined items
+              <Card className="p-6 bg-slate-200/15 backdrop-filter backdrop-blur-2xl rounded-3xl shadow-[0_25px_50px_-12px_rgba(0,0,0,0.18),_0_15px_30px_-20px_rgba(0,0,0,0.12)] border border-white/20">
+                <CardContent className="pt-6 pb-6 text-center bg-transparent"> {/* Adjusted padding to work with p-6 on Card */}
+                  <Inbox className="h-16 w-16 text-slate-500 mx-auto mb-6" /> {/* Adjusted icon color & margin */}
+                  <p className="text-xl font-semibold text-slate-700"> {/* Adjusted text style */}
+                    {selectedClassFilter === "all"
+                      ? "Пока нет предметов или подгрупп"
+                      : "Нет подгрупп для этого класса"}
+                  </p>
+                  <p className="text-sm text-slate-500 mt-2"> {/* Adjusted text style & margin */}
+                    {selectedClassFilter === "all"
+                      ? "Попробуйте добавить новый предмет или подгруппу, чтобы начать."
+                      : "Вы можете добавить подгруппу для этого класса или изменить фильтр."}
+                  </p>
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"> {/* Increased gap */}
                 {combinedItems.map((item) => (
                   <SubjectSubgroupCard
                     key={'isSubgroup' in item ? `subgroup-${item.id}` : `subject-${item.id}`}
                     item={item}
                     classes={classes}
                     subjects={subjects}
-                    onClick={handleCardClick}
-                    onEdit={handleEditItem}
-                    onDelete={handleDeleteItem}
+                    onClick={handleCardClick} // Already useCallback
+                    onEdit={openEditDialog}    // useCallback
+                    onDelete={openDeleteDialog}  // useCallback
                   />
                 ))}
               </div>
             )}
           </div>
-        )}
-      </div>
+          {/* The extra closing bracket was here, now removed. */}
+        </div>
 
-      {/* Диалоги для добавления */}
-      <SubjectFormDialog
-        isOpen={isSubjectDialogOpen}
-        onClose={() => setIsSubjectDialogOpen(false)}
-        onSubmit={handleCreateSubject}
-        isLoading={createSubjectMutation.isPending}
-      />
-      <SubgroupFormDialog
-        isOpen={isSubgroupDialogOpen}
-        onClose={() => setIsSubgroupDialogOpen(false)}
-        onSubmit={handleCreateSubgroup}
-        isLoading={createSubgroupMutation.isPending}
-        classes={classes}
-        subjects={subjects}
-      />
+        {/* --- Dialogs --- */}
+        <SubjectFormDialog
+          isOpen={isSubjectDialogOpen}
+          onClose={closeCreateSubjectDialog} // useCallback
+          onSubmit={handleCreateSubject}
+          isLoading={createSubjectMutation.isPending}
+        />
+        <SubgroupFormDialog
+          isOpen={isSubgroupDialogOpen}
+          onClose={closeCreateSubgroupDialog} // useCallback
+          onSubmit={handleCreateSubgroup}
+          isLoading={createSubgroupMutation.isPending}
+          classes={classes}
+          subjects={subjects}
+        />
 
-      {/* Диалог удаления */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={closeDeleteDialog}>
+        <DialogContent className="p-6 bg-slate-200/15 backdrop-filter backdrop-blur-2xl rounded-3xl shadow-[0_25px_50px_-12px_rgba(0,0,0,0.18),_0_15px_30px_-20px_rgba(0,0,0,0.12)] border border-white/20">
           <DialogHeader>
-            <DialogTitle>Удаление</DialogTitle>
-            <DialogDescription>
-              Вы уверены, что хотите удалить {('isSubgroup' in (itemToDelete || {})) ? 'подгруппу' : 'предмет'} "{itemToDelete?.name}"?
+            <DialogTitle className="text-slate-800">Удаление</DialogTitle> {/* Deletion */}
+            <DialogDescription className="text-slate-600">
+              Вы уверены, что хотите удалить {('isSubgroup' in (itemToDelete || {})) ? 'подгруппу' : 'предмет'} "{itemToDelete?.name}"? {/* Are you sure you want to delete... */}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Отмена</Button>
+          <div className="flex justify-end gap-3 mt-6 pt-2"> {/* Increased gap and added padding top */}
+            <Button 
+              onClick={closeDeleteDialog}
+              className="inline-flex items-center justify-center rounded-full px-6 py-3 text-base font-medium bg-white/15 backdrop-filter backdrop-blur-lg text-slate-800 shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.45),inset_0_1px_2px_rgba(0,0,0,0.05),0_15px_30px_-8px_rgba(0,0,0,0.08),_0_8px_20px_-12px_rgba(0,0,0,0.05)] hover:bg-white/25 hover:shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.55),inset_0_1px_2px_rgba(0,0,0,0.08),0_18px_35px_-8px_rgba(0,0,0,0.1),0_10px_25px_-12px_rgba(0,0,0,0.07)] hover:-translate-y-px active:scale-[0.98] active:bg-white/20 active:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.3),inset_0_1px_3px_rgba(0,0,0,0.1)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 transition-all duration-200 ease-in-out"
+            >
+              Отмена
+            </Button> {/* Cancel */}
             <Button
-              variant="destructive"
               onClick={() => {
                 if (!itemToDelete) return;
                 if ('isSubgroup' in itemToDelete) {
@@ -489,7 +515,9 @@ export default function SubjectsManagementPage() {
                 }
               }}
               disabled={deleteSubjectMutation.isPending || deleteSubgroupMutation.isPending}
+              className="inline-flex items-center justify-center rounded-full px-6 py-3 text-base font-medium text-white bg-gradient-to-b from-red-500/95 via-red-600/90 to-red-700/95 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),inset_0_0_0_1.5px_rgba(255,255,255,0.2),0_5px_15px_-3px_rgba(127,29,29,0.2),_0_8px_25px_-8px_rgba(127,29,29,0.15)] hover:from-red-400/95 hover:via-red-500/90 hover:to-red-600/95 hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.5),inset_0_0_0_1.5px_rgba(255,255,255,0.3),0_6px_18px_-3px_rgba(127,29,29,0.25),_0_10px_30px_-8px_rgba(127,29,29,0.2)] hover:-translate-y-px active:scale-[0.97] active:from-red-600/95 active:via-red-700/90 active:to-red-800/95 active:shadow-[inset_0_1px_3px_rgba(0,0,0,0.25)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 transition-all duration-200 ease-in-out"
             >
+              {deleteSubjectMutation.isPending || deleteSubgroupMutation.isPending ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
               {deleteSubjectMutation.isPending || deleteSubgroupMutation.isPending ? "Удаление..." : "Удалить"}
             </Button>
           </div>
@@ -497,44 +525,48 @@ export default function SubjectsManagementPage() {
       </Dialog>
 
       {/* Диалог редактирования */}
-      {isEditDialogOpen && itemToEdit && (
-        'isSubgroup' in itemToEdit ? (
-          <SubgroupFormDialog
-            isOpen={isEditDialogOpen}
-            onClose={() => { setIsEditDialogOpen(false); setItemToEdit(null); }}
-            onSubmit={(values) => {
-              // Оставляем только нужные поля для подгруппы
-              const { name, description, classId, studentIds } = values;
-              editSubgroupMutation.mutate({ id: itemToEdit.id, values: { name, description, classId: parseInt(classId), studentIds: studentIds?.map(Number) || [] } });
-            }}
-            isLoading={editSubgroupMutation.isPending}
-            classes={classes}
-            subjects={subjects}
-            // Передаем значения по умолчанию
-            defaultValues={{
-              name: itemToEdit.name,
-              description: itemToEdit.description || "",
-              classId: itemToEdit.classId?.toString() || "",
-              studentIds: itemToEdit.studentIds ? itemToEdit.studentIds.map(String) : [],
-            }}
-          />
-        ) : (
-          <SubjectFormDialog
-            isOpen={isEditDialogOpen}
-            onClose={() => { setIsEditDialogOpen(false); setItemToEdit(null); }}
-            onSubmit={(values) => {
-              // Передаём только name и description
-              editSubjectMutation.mutate({ id: itemToEdit.id, values: { name: values.name, description: values.description } });
-            }}
-            isLoading={editSubjectMutation.isPending}
-            // Передаем значения по умолчанию
-            defaultValues={{
-              name: itemToEdit.name,
-              description: itemToEdit.description || "",
-            }}
-          />
-        )
-      )}
+      {/* Edit Subgroup Dialog - Always Mounted */}
+      <SubgroupFormDialog
+        isOpen={isEditDialogOpen && !!itemToEdit && 'isSubgroup' in itemToEdit}
+        onClose={closeEditDialog}
+        onSubmit={(values) => {
+          if (!itemToEdit || !('isSubgroup' in itemToEdit)) return;
+          const { name, description, classId, studentIds } = values;
+          editSubgroupMutation.mutate({ 
+            id: itemToEdit.id, 
+            values: { name, description, classId: parseInt(classId), studentIds: studentIds?.map(Number) || [] } 
+          });
+        }}
+        isLoading={editSubgroupMutation.isPending}
+        classes={classes}
+        subjects={subjects}
+        defaultValues={itemToEdit && 'isSubgroup' in itemToEdit ? {
+          name: itemToEdit.name,
+          description: itemToEdit.description || "",
+          classId: itemToEdit.classId?.toString() || "",
+          studentIds: itemToEdit.studentIds ? itemToEdit.studentIds.map(String) : [],
+          id: itemToEdit.id, // Pass ID for edit mode detection in dialog
+        } : undefined}
+      />
+      {/* Edit Subject Dialog - Always Mounted */}
+      <SubjectFormDialog
+        isOpen={isEditDialogOpen && !!itemToEdit && !('isSubgroup' in itemToEdit)}
+        onClose={closeEditDialog}
+        onSubmit={(values) => {
+          if (!itemToEdit || 'isSubgroup' in itemToEdit) return;
+          editSubjectMutation.mutate({ 
+            id: itemToEdit.id, 
+            values: { name: values.name, description: values.description } 
+          });
+        }}
+        isLoading={editSubjectMutation.isPending}
+        defaultValues={itemToEdit && !('isSubgroup' in itemToEdit) ? {
+          name: itemToEdit.name,
+          description: itemToEdit.description || "",
+          // id: itemToEdit.id // If SubjectFormDialog uses id for edit mode detection
+        } : undefined}
+      />
+      </TooltipProvider> {/* Closed TooltipProvider */}
     </MainLayout>
   );
 }

@@ -344,28 +344,27 @@ export default function ClassGradeDetailsPage() {
     return assignments.filter(a => a.scheduleId === scheduleId);
   }, [assignments]);
 
-  // Функция для получения цвета фона ячейки на основе типа задания
-  const getAssignmentTypeColor = useCallback((assignmentType: string) => {
-    console.log("Получение цвета для типа задания:", assignmentType);
-    
+  // Функция для получения цвета фона ячейки на основе типа задания (visionOS inspired)
+  const getAssignmentTypeColor = useCallback((assignmentType: string): string => {
+    // console.log("Получение цвета для типа задания:", assignmentType);
     switch(assignmentType) {
-      case AssignmentTypeEnum.CONTROL_WORK: // control_work
-        return 'bg-red-100';
-      case AssignmentTypeEnum.TEST_WORK: // test_work
-        return 'bg-blue-100';
-      case AssignmentTypeEnum.CURRENT_WORK: // current_work
-        return 'bg-green-100';
-      case AssignmentTypeEnum.HOMEWORK: // homework
-        return 'bg-amber-100';
-      case AssignmentTypeEnum.CLASSWORK: // classwork
-        return 'bg-purple-100';
-      case AssignmentTypeEnum.PROJECT_WORK: // project_work
-        return 'bg-emerald-100';
-      case AssignmentTypeEnum.CLASS_ASSIGNMENT: // class_assignment
-        return 'bg-indigo-100';
+      case AssignmentTypeEnum.CONTROL_WORK:
+        return 'bg-red-500/15 text-red-700 border-red-700/30 hover:border-red-700/50 hover:bg-red-500/25';
+      case AssignmentTypeEnum.TEST_WORK:
+        return 'bg-sky-500/15 text-sky-700 border-sky-700/30 hover:border-sky-700/50 hover:bg-sky-500/25'; // Changed blue to sky for better differentiation
+      case AssignmentTypeEnum.CURRENT_WORK:
+        return 'bg-green-500/15 text-green-700 border-green-700/30 hover:border-green-700/50 hover:bg-green-500/25';
+      case AssignmentTypeEnum.HOMEWORK:
+        return 'bg-amber-500/15 text-amber-700 border-amber-700/30 hover:border-amber-700/50 hover:bg-amber-500/25';
+      case AssignmentTypeEnum.CLASSWORK:
+        return 'bg-purple-500/15 text-purple-700 border-purple-700/30 hover:border-purple-700/50 hover:bg-purple-500/25';
+      case AssignmentTypeEnum.PROJECT_WORK:
+        return 'bg-emerald-500/15 text-emerald-700 border-emerald-700/30 hover:border-emerald-700/50 hover:bg-emerald-500/25';
+      case AssignmentTypeEnum.CLASS_ASSIGNMENT: // Often similar to classwork or current_work
+        return 'bg-indigo-500/15 text-indigo-700 border-indigo-700/30 hover:border-indigo-700/50 hover:bg-indigo-500/25';
       default:
-        console.warn("Неизвестный тип задания:", assignmentType);
-        return 'bg-gray-100'; // Возвращаем серый цвет для неизвестных типов
+        // console.warn("Неизвестный тип задания:", assignmentType);
+        return 'bg-slate-500/15 text-slate-700 border-slate-700/30 hover:border-slate-700/50 hover:bg-slate-500/25';
     }
   }, []);
 
@@ -1388,6 +1387,16 @@ export default function ClassGradeDetailsPage() {
     return gradeTypes[gradeType] || gradeType;
   };
 
+  // Function to get styling for grade pills (5-point system) - visionOS inspired
+  const getGradePillStyle = useCallback((grade: number): string => {
+    if (grade === 5) return 'bg-green-500/20 text-green-700 border border-green-600/40';
+    if (grade === 4) return 'bg-sky-500/20 text-sky-700 border border-sky-600/40';
+    if (grade === 3) return 'bg-amber-500/20 text-amber-700 border border-amber-600/40';
+    if (grade === 2) return 'bg-orange-500/20 text-orange-700 border border-orange-600/40';
+    if (grade === 1) return 'bg-red-500/20 text-red-700 border border-red-600/40';
+    return 'bg-slate-500/20 text-slate-700 border border-slate-600/40'; // Default/fallback
+  }, []);
+
   // Фильтрация оценок в зависимости от подгруппы
   const filteredGrades = useMemo(() => {
     // Защита от пустых данных
@@ -1699,42 +1708,40 @@ export default function ClassGradeDetailsPage() {
   };
 
   return (
-    <MainLayout>
-      <div className="container mx-auto py-6 space-y-6">
-        <div className="flex justify-between items-center">
+    <MainLayout className="bg-slate-100"> {/* Applied page background */}
+      <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8"> {/* Adjusted padding and spacing */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"> {/* Adjusted for responsiveness */}
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900"> {/* Styled title */}
               Журнал оценок
               {subgroupData ? (
-                <span className="text-emerald-600 ml-2">
+                <span className="text-blue-600 font-semibold ml-2"> {/* Styled subgroup name */}
                   ({subgroupData.name})
                 </span>
               ) : null}
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-slate-600 mt-1"> {/* Styled description */}
               {subgroupData 
                 ? `Просмотр и редактирование оценок учеников подгруппы "${subgroupData.name}"`
                 : "Просмотр и редактирование оценок учеников класса"}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-3 self-start sm:self-center"> {/* Adjusted gap and alignment */}
             {/* Показываем кнопку создания задания только если выбран накопительный тип оценивания */}
             {classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && canEditGrades && (
               <Button
-                variant="default"
-                className="gap-2"
                 onClick={() => openAssignmentDialog()}
                 disabled={isLoading}
+                className="bg-blue-600 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-600/50 rounded-md px-4 py-2 flex items-center gap-2" // Primary button style
               >
                 <PlusCircle className="h-4 w-4" />
                 Добавить задание
               </Button>
             )}
             <Button
-              variant="outline"
-              className="gap-2"
               onClick={exportToCSV}
               disabled={isLoading || !filteredStudents.length}
+              className="bg-slate-200 text-slate-700 hover:bg-slate-300 focus:ring-2 focus:ring-slate-400/50 rounded-md px-4 py-2 flex items-center gap-2" // Secondary button style
             >
               <Download className="h-4 w-4" />
               Экспорт
@@ -1747,25 +1754,26 @@ export default function ClassGradeDetailsPage() {
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
           </div>
         ) : (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <GraduationCapIcon className="h-5 w-5" />
+          <div className="space-y-8"> {/* Increased spacing for better separation */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6"> {/* Increased gap */}
+              {/* Class Info Card - Applying Glassmorphism */}
+              <Card className="bg-white/30 backdrop-filter backdrop-blur-xl rounded-2xl shadow-lg border border-white/20">
+                <CardHeader className="bg-transparent">
+                  <CardTitle className="flex items-center gap-2 text-slate-800">
+                    <GraduationCapIcon className="h-5 w-5 text-slate-700" /> {/* Styled icon */}
                     Информация о классе
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="bg-transparent">
                   {classData && (
-                    <div className="space-y-2">
+                    <div className="space-y-3"> {/* Adjusted spacing */}
                       <div>
-                        <h3 className="font-medium">Класс:</h3>
-                        <p className="text-lg text-muted-foreground">{classData.name}</p>
+                        <h3 className="font-medium text-slate-700">Класс:</h3>
+                        <p className="text-lg text-slate-800">{classData.name}</p>
                       </div>
                       <div>
-                        <h3 className="font-medium">Всего учеников:</h3>
-                        <p className="text-lg text-muted-foreground">
+                        <h3 className="font-medium text-slate-700">Всего учеников:</h3>
+                        <p className="text-lg text-slate-800">
                           {subgroupId 
                             ? `${filteredStudents.length} (из подгруппы)`
                             : students.length}
@@ -1776,23 +1784,24 @@ export default function ClassGradeDetailsPage() {
                 </CardContent>
               </Card>
               
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BookOpenIcon className="h-5 w-5" />
+              {/* Subject Info Card - Applying Glassmorphism */}
+              <Card className="bg-white/30 backdrop-filter backdrop-blur-xl rounded-2xl shadow-lg border border-white/20">
+                <CardHeader className="bg-transparent">
+                  <CardTitle className="flex items-center gap-2 text-slate-800">
+                    <BookOpenIcon className="h-5 w-5 text-slate-700" /> {/* Styled icon */}
                     Информация о предмете
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="bg-transparent">
                   {subjectData && (
-                    <div className="space-y-2">
+                    <div className="space-y-3"> {/* Adjusted spacing */}
                       <div>
-                        <h3 className="font-medium">Предмет:</h3>
-                        <p className="text-lg text-muted-foreground">{subjectData.name}</p>
+                        <h3 className="font-medium text-slate-700">Предмет:</h3>
+                        <p className="text-lg text-slate-800">{subjectData.name}</p>
                       </div>
                       <div>
-                        <h3 className="font-medium">Всего уроков:</h3>
-                        <p className="text-lg text-muted-foreground">{lessonSlots.length}</p>
+                        <h3 className="font-medium text-slate-700">Всего уроков:</h3>
+                        <p className="text-lg text-slate-800">{lessonSlots.length}</p>
                       </div>
                     </div>
                   )}
@@ -1800,71 +1809,58 @@ export default function ClassGradeDetailsPage() {
               </Card>
             </div>
             
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CalendarIcon className="h-5 w-5" />
+            <Card className="bg-white/30 backdrop-filter backdrop-blur-xl rounded-2xl shadow-lg border border-white/20">
+              <CardHeader className="bg-transparent pt-4 pb-3"> {/* Adjusted padding */}
+                <CardTitle className="flex items-center gap-2 text-slate-800 text-xl"> {/* Adjusted size */}
+                  <CalendarIcon className="h-5 w-5 text-slate-700" />
                   Оценки по предмету
                   {subgroupId && subgroupData && (
-                    <span className="ml-2 text-sm bg-primary/10 text-primary px-2 py-1 rounded-md">
+                    <span className="ml-2 text-sm bg-blue-500/10 text-blue-700 px-2.5 py-1 rounded-lg font-semibold"> {/* Styled subgroup badge */}
                       Подгруппа: {subgroupData.name}
                     </span>
                   )}
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-slate-600 mt-1"> {/* Adjusted margin */}
                   {subgroupId 
                     ? `Журнал показывает только учеников из выбранной подгруппы. `
                     : ''}
-                  Нажмите на пустую ячейку, чтобы добавить оценку. Нажмите на дату урока, чтобы изменить его статус.
+                  Нажмите на пустую ячейку, чтобы добавить оценку. Нажмите на заголовок даты урока для действий с уроком.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="overflow-auto">
-                  <Table className="border">
+              <CardContent className="bg-transparent p-0"> {/* Removed CardContent padding, will apply to div.overflow-auto */}
+                <div className="overflow-auto rounded-b-2xl p-0.5"> {/* Added rounding to match card, added slight padding for table border visibility */}
+                  <Table className="min-w-full border-collapse"> {/* Removed default Table border, using cell borders */}
                     <TableHeader>
-                      <TableRow>
-                        <TableHead className="bg-muted/50 sticky left-0">
+                      <TableRow className="border-b border-slate-300/50">
+                        <TableHead className="bg-slate-100/80 backdrop-blur-md sticky left-0 z-20 px-4 py-3 text-left text-sm font-semibold text-slate-700 shadow-sm"> {/* Styled sticky student header */}
                           Ученик
                         </TableHead>
                         {/* Для каждого урока (lessonSlot) */}
                         {lessonSlots.map((slot) => {
                           const isLessonConducted = schedules.find(s => s.id === slot.scheduleId)?.status === 'conducted';
                           
-                          // Проверяем, есть ли задания для накопительной системы
                           if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && 
                               slot.assignments && slot.assignments.length > 0) {
-                              
-                            // Для накопительной системы создаем отдельную колонку для каждого задания
                             return (
                               <React.Fragment key={`header-${slot.date}-${slot.scheduleId}`}>
-                                {/* Колонка с датой урока (объединяет все подколонки заданий) */}
                                 <TableHead 
                                   colSpan={slot.assignments.length}
-                                  className="text-center border-b-2 border-primary/30 px-1 pt-1 pb-0"
+                                  className="bg-slate-200/40 backdrop-blur-sm text-center border-b border-slate-300/70 px-1 pt-2 pb-1 text-sm font-semibold text-slate-700 cursor-pointer hover:bg-slate-200/60 transition-colors"
                                   onClick={() => canEditGrades ? handleHeaderClick(slot) : null}
                                 >
                                   <div className="flex flex-col items-center justify-center mb-1">
-                                    <span className="font-medium">{slot.formattedDate}</span>
-                                    {slot.startTime && <span className="text-xs">({slot.startTime.slice(0, 5)})</span>}
-                                    
-                                    {/* Индикатор проведенного урока */}
+                                    <span className="font-semibold">{slot.formattedDate}</span>
+                                    {slot.startTime && <span className="text-xs text-slate-600">({slot.startTime.slice(0, 5)})</span>}
                                     {isLessonConducted && (
-                                      <div className="flex items-center">
-                                        <span className="text-green-600 ml-1">
-                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                          </svg>
-                                        </span>
-                                        
-                                        {/* Кнопка для добавления задания */}
+                                      <div className="flex items-center text-green-600" title="Урок проведен">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                        </svg>
                                         {canEditGrades && (
                                           <button
-                                            onClick={(e) => {
-                                              e.stopPropagation(); // Предотвращаем открытие диалога статуса
-                                              openAssignmentDialog(slot.scheduleId);
-                                            }}
-                                            className="ml-1 text-primary hover:text-primary-dark focus:outline-none"
-                                            title="Добавить задание"
+                                            onClick={(e) => { e.stopPropagation(); openAssignmentDialog(slot.scheduleId); }}
+                                            className="ml-1 text-blue-600 hover:text-blue-800 focus:outline-none"
+                                            title="Добавить задание к этому уроку"
                                           >
                                             <PlusCircle className="h-3 w-3" />
                                           </button>
@@ -1872,24 +1868,15 @@ export default function ClassGradeDetailsPage() {
                                       </div>
                                     )}
                                   </div>
-                                  
-                                  {/* Подколонки с отдельными заданиями */}
-                                  <div className="flex justify-center space-x-1">
+                                  <div className="flex justify-center space-x-0.5">
                                     {slot.assignments.map(assignment => (
-                                      <div 
-                                        key={assignment.id}
-                                        className="flex-1 text-xs"
-                                      >
+                                      <div key={assignment.id} className="flex-1 text-xs min-w-[40px] max-w-[60px]"> {/* Added max-width */}
                                         <span 
-                                          className={`${getAssignmentTypeColor(assignment.assignmentType)} text-gray-800 px-1 py-0.5 rounded-sm border border-gray-300 block cursor-pointer hover:border-primary hover:bg-primary/10 transition-colors truncate`}
+                                          className={`px-1.5 py-1 rounded-md border block cursor-pointer transition-colors truncate ${getAssignmentTypeColor(assignment.assignmentType)}`} // Using new getAssignmentTypeColor
                                           title={`${getAssignmentTypeName(assignment.assignmentType)}: ${assignment.maxScore} баллов. Нажмите для редактирования.`}
-                                          onClick={(e) => {
-                                            e.stopPropagation(); // Предотвращаем открытие диалога статуса
-                                            openEditAssignmentDialog(assignment);
-                                          }}
+                                          onClick={(e) => { e.stopPropagation(); openEditAssignmentDialog(assignment); }}
                                         >
-                                          {getAssignmentTypeName(assignment.assignmentType).substring(0, 2)}
-                                          {' '}{assignment.maxScore}б
+                                          {getAssignmentTypeName(assignment.assignmentType).substring(0, 1)}{assignment.maxScore} {/* Compact display */}
                                         </span>
                                       </div>
                                     ))}
@@ -1898,34 +1885,25 @@ export default function ClassGradeDetailsPage() {
                               </React.Fragment>
                             );
                           } else {
-                            // Для обычной системы оценивания или уроков без заданий - стандартный заголовок
                             return (
                               <TableHead 
                                 key={`${slot.date}-${slot.scheduleId}`} 
-                                className="text-center cursor-pointer"
+                                className="bg-slate-200/40 backdrop-blur-sm text-center border-b border-slate-300/70 px-3 py-3 text-sm font-semibold text-slate-700 cursor-pointer hover:bg-slate-200/60 transition-colors"
                                 onClick={() => canEditGrades ? handleHeaderClick(slot) : null}
                               >
                                 <div className="flex flex-col items-center justify-center">
                                   {slot.formattedDate}
-                                  {slot.startTime && <span className="text-xs">({slot.startTime.slice(0, 5)})</span>}
-                                  
+                                  {slot.startTime && <span className="text-xs text-slate-600">({slot.startTime.slice(0, 5)})</span>}
                                   {isLessonConducted && (
-                                    <div className="flex items-center">
-                                      <span className="text-green-600 ml-1">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                        </svg>
-                                      </span>
-                                      
-                                      {/* Кнопка для добавления задания (только для накопительной системы) */}
+                                    <div className="flex items-center text-green-600" title="Урок проведен">
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                      </svg>
                                       {classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && canEditGrades && (
                                         <button
-                                          onClick={(e) => {
-                                            e.stopPropagation(); // Предотвращаем открытие диалога статуса
-                                            openAssignmentDialog(slot.scheduleId);
-                                          }}
-                                          className="ml-1 text-primary hover:text-primary-dark focus:outline-none"
-                                          title="Добавить задание"
+                                          onClick={(e) => { e.stopPropagation(); openAssignmentDialog(slot.scheduleId);}}
+                                          className="ml-1 text-blue-600 hover:text-blue-800 focus:outline-none"
+                                          title="Добавить задание к этому уроку"
                                         >
                                           <PlusCircle className="h-3 w-3" />
                                         </button>
@@ -1937,39 +1915,33 @@ export default function ClassGradeDetailsPage() {
                             );
                           }
                         })}
-                        <TableHead className="text-center sticky right-0 bg-muted/50">
+                        <TableHead className="bg-slate-100/80 backdrop-blur-md text-center sticky right-0 z-20 px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">
                           Средний балл
                         </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredStudents.map((student) => (
-                        <TableRow key={student.id}>
-                          <TableCell className="font-medium bg-muted/20">
+                        <TableRow key={student.id} className="border-b border-slate-300/50 hover:bg-slate-500/5"> {/* Styled TableRow */}
+                          <TableCell className="font-medium bg-slate-50/70 backdrop-blur-sm sticky left-0 z-10 px-4 py-2 text-sm text-slate-800 border-r border-slate-300/50"> {/* Styled sticky student cell */}
                             {student.lastName} {student.firstName}
                           </TableCell>
                           {/* Для каждого урока (lessonSlot) */}
                           {lessonSlots.map((slot) => {
                             const studentGrades = getStudentGradeForSlot(student.id, slot, filteredGrades);
                             
-                            // Проверяем, используется ли накопительная система и есть ли задания для этого урока
                             if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && 
                                 slot.assignments && slot.assignments.length > 0) {
-                                  
-                              // Для накопительной системы с заданиями отображаем отдельные ячейки по одной для каждого задания
                               return (
-                                <React.Fragment key={`${slot.date}-${slot.scheduleId}`}>
+                                <React.Fragment key={`${slot.date}-${slot.scheduleId}-${student.id}`}> {/* Ensure unique key for fragment */}
                                   {slot.assignments.map((assignment) => {
-                                    // Найдем оценку студента за данное задание (если есть)
                                     const assignmentGrade = studentGrades.find(g => g.assignmentId === assignment.id);
-                                    
                                     return (
                                       <TableCell 
-                                        key={`${slot.scheduleId}-${assignment.id}`}
-                                        className={`text-center p-1 border-r ${getAssignmentTypeColor(assignment.assignmentType)}`}
+                                        key={`${slot.scheduleId}-${assignment.id}-${student.id}`} // Ensure unique key for cell
+                                        className={`text-center p-1 border-r border-slate-200/60 ${getAssignmentTypeColor(assignment.assignmentType).split(' ').find(cls => cls.startsWith('bg-'))}`} // Apply only bg color part
                                       >
                                         {assignmentGrade ? (
-                                          // Если оценка уже есть, показываем её с возможностью редактирования
                                           <div className="relative group">
                                             <span 
                                               className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium cursor-help bg-white/80"
@@ -2009,31 +1981,24 @@ export default function ClassGradeDetailsPage() {
                                             )}
                                           </div>
                                         ) : canEditGrades && isLessonConducted(slot.scheduleId) ? (
-                                          // Если нет оценки, но учитель может выставлять и урок проведен - показываем поле ввода
                                           <div className="flex items-center justify-center">
                                             <input
                                               type="text"
-                                              className="w-8 h-6 text-center text-xs border rounded"
+                                              className="w-10 h-7 text-center text-sm border border-slate-300/70 rounded-md bg-white/50 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 placeholder:text-slate-400/70" // Styled input
                                               placeholder={`/${assignment.maxScore}`}
-                                              maxLength={2}
+                                              maxLength={assignment.maxScore.toString().length} // Dynamic maxLength
                                               onKeyDown={(e) => {
                                                 if (e.key === 'Enter') {
                                                   const value = e.currentTarget.value;
-                                                  handleDirectGradeInput(
-                                                    student.id, 
-                                                    slot.scheduleId, 
-                                                    assignment.id, 
-                                                    value
-                                                  );
-                                                  e.currentTarget.value = '';
+                                                  handleDirectGradeInput(student.id, slot.scheduleId, assignment.id, value);
+                                                  e.currentTarget.value = ''; // Clear after submit
                                                 }
                                               }}
-                                              title={`Введите оценку из ${assignment.maxScore} и нажмите Enter`}
+                                              title={`Введите оценку (макс. ${assignment.maxScore}) и нажмите Enter`}
                                             />
                                           </div>
                                         ) : (
-                                          // Если нет оценки и учитель не может выставлять - показываем пустую ячейку
-                                          <span className="text-gray-400">-</span>
+                                          <span className="text-slate-400">-</span> // Softer placeholder for empty/non-editable
                                         )}
                                       </TableCell>
                                     );
@@ -2041,84 +2006,63 @@ export default function ClassGradeDetailsPage() {
                                 </React.Fragment>
                               );
                             } else {
-                              // Для обычной системы оценивания (или если нет заданий) показываем одну ячейку
+                              // Standard 5-point system or no assignments
                               return (
                                 <TableCell 
-                                  key={`${slot.date}-${slot.scheduleId}`} 
-                                  className="text-center p-2"
+                                  key={`${slot.date}-${slot.scheduleId}-${student.id}`} // Ensure unique key for cell
+                                  className="text-center p-2 border-r border-slate-200/60" // Adjusted padding and border
                                 >
                                   {studentGrades.length > 0 ? (
                                     <div className="flex flex-wrap justify-center gap-1 items-center">
                                       {studentGrades.map((grade) => (
                                         <div key={grade.id} className="relative group">
                                           <span 
-                                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-help
-                                              ${grade.gradeType === 'test' || grade.gradeType === 'Контрольная' ? 'bg-blue-600' : 
-                                              grade.gradeType === 'exam' || grade.gradeType === 'Экзамен' ? 'bg-purple-600' : 
-                                              grade.gradeType === 'homework' || grade.gradeType === 'Домашняя' ? 'bg-amber-600' : 
-                                              grade.gradeType === 'project' ? 'bg-emerald-600' : 
-                                              grade.gradeType === 'classwork' || grade.gradeType === 'Практическая' ? 'bg-green-600' :
-                                              'bg-primary'} text-primary-foreground`}
+                                            className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold cursor-help ${getGradePillStyle(grade.grade)}`} // Applied new getGradePillStyle, increased padding & rounding
                                             title={`${getGradeTypeName(grade.gradeType)}${grade.comment ? ': ' + grade.comment : ''}`}
                                           >
                                             {grade.grade}
                                           </span>
-                                          
                                           {canEditGrades && (
-                                            <div className="absolute invisible group-hover:visible -top-2 -right-2 flex space-x-1">
+                                            <div className="absolute invisible group-hover:visible -top-3 -right-3 z-30 flex space-x-1.5"> {/* Adjusted positioning and spacing */}
                                               <Button
                                                 variant="outline"
                                                 size="icon"
-                                                className="h-5 w-5 p-0 bg-background border-muted-foreground/50"
+                                                className="h-7 w-7 p-0 bg-white/80 backdrop-blur-md border-slate-400/70 hover:bg-slate-200/80 rounded-full shadow-lg" // Enhanced button style
                                                 onClick={() => openEditGradeDialog(grade)}
                                                 title="Редактировать оценку"
                                               >
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                  <path d="M12 20h9"></path>
-                                                  <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
-                                                </svg>
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
                                               </Button>
                                               <Button
                                                 variant="outline"
                                                 size="icon"
-                                                className="h-5 w-5 p-0 bg-background border-destructive text-destructive"
+                                                className="h-7 w-7 p-0 bg-white/80 backdrop-blur-md border-red-500/70 text-red-500 hover:bg-red-100/80 rounded-full shadow-lg" // Enhanced button style
                                                 onClick={() => handleDeleteGrade(grade.id)}
                                                 title="Удалить оценку"
                                               >
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                  <path d="M3 6h18"></path>
-                                                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                                                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                                                </svg>
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
                                               </Button>
                                             </div>
                                           )}
                                         </div>
                                       ))}
-                                      {/* Убрали кнопку "+" для добавления еще одной оценки, используем прямой ввод */}
                                     </div>
-                                  ) : canEditGrades && ((classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && slot.assignments && slot.assignments.length > 0) 
-                                      || classData?.gradingSystem !== GradingSystemEnum.CUMULATIVE) ? (
-                                    // Для пустой ячейки показываем поле для ввода только если:
-                                    // 1) В накопительной системе - есть задания для этого урока
-                                    // 2) В обычной системе - всегда показываем
+                                  ) : canEditGrades && isLessonConducted(slot.scheduleId) ? (
                                     <div 
-                                      className="w-10 h-7 border border-dashed rounded flex items-center justify-center text-gray-400 cursor-pointer hover:border-primary hover:text-primary transition-colors"
+                                      className="w-10 h-7 border-2 border-dashed border-slate-300/70 rounded-lg flex items-center justify-center text-slate-400/90 cursor-pointer hover:border-blue-500/70 hover:text-blue-500 transition-colors duration-150" // Enhanced placeholder
                                       onClick={() => openGradeDialog(student.id, slot.date, slot.scheduleId)}
                                       title="Нажмите для добавления оценки"
                                     >
-                                      {classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && slot.assignments && slot.assignments.length > 0 
-                                        ? `/${slot.assignments[0].maxScore}` 
-                                        : `/5`}
+                                      <PlusCircle className="h-4 w-4" />
                                     </div>
                                   ) : (
-                                    "-"
+                                    <span className="text-slate-400/90">-</span> 
                                   )}
                                 </TableCell>
                               );
                             }
                           })}
-                          <TableCell className="text-center font-medium sticky right-0 bg-muted/30">
+                          <TableCell className="text-center font-medium sticky right-0 z-10 bg-slate-50/80 backdrop-blur-sm px-3 py-2 text-sm text-slate-800 shadow-sm"> {/* Enhanced sticky average cell */}
                             {calculateAverageGrade(student.id)}
                           </TableCell>
                         </TableRow>
@@ -2135,10 +2079,10 @@ export default function ClassGradeDetailsPage() {
         
         {/* Dialog for changing lesson status */}
         <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Статус урока</DialogTitle>
-              <DialogDescription>
+          <DialogContent className="sm:max-w-md bg-white/50 backdrop-filter backdrop-blur-xl rounded-2xl shadow-xl border border-white/20">
+            <DialogHeader className="bg-transparent pt-2">
+              <DialogTitle className="text-slate-800 text-xl">Статус урока</DialogTitle>
+              <DialogDescription className="text-slate-600">
                 {selectedSchedule && `Изменение статуса урока: ${
                   format(new Date(selectedSchedule.scheduleDate || ''), "dd.MM.yyyy", { locale: ru })
                 } (${selectedSchedule.startTime.slice(0, 5)} - ${selectedSchedule.endTime.slice(0, 5)})`}
@@ -2149,81 +2093,65 @@ export default function ClassGradeDetailsPage() {
               <div className="flex flex-col gap-4">
                 <div className="grid grid-cols-2 gap-4">
                   <Button 
-                    variant={selectedSchedule?.status === 'not_conducted' ? 'default' : 'outline'} 
-                    className="w-full py-8 flex flex-col items-center justify-center gap-2"
+                    variant={selectedSchedule?.status === 'not_conducted' ? "default" : "outline"} 
+                    className={`w-full py-8 flex flex-col items-center justify-center gap-2 rounded-lg transition-all
+                                ${selectedSchedule?.status === 'not_conducted' 
+                                  ? 'bg-orange-500/80 text-white hover:bg-orange-600/90 shadow-md ring-2 ring-orange-500/50' 
+                                  : 'bg-slate-500/20 text-slate-700 hover:bg-slate-500/30 border-slate-400/50'}`}
                     onClick={() => handleScheduleStatusUpdate('not_conducted')}
                   >
-                    <svg 
-                      xmlns="http://www.w3.org/2000/svg" 
-                      className="h-8 w-8" 
-                      viewBox="0 0 20 20" 
-                      fill="currentColor"
-                    >
-                      <path 
-                        fillRule="evenodd" 
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" 
-                        clipRule="evenodd" 
-                      />
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                     </svg>
                     <span>Не проведен</span>
                   </Button>
                   
                   <Button 
-                    variant={selectedSchedule?.status === 'conducted' ? 'default' : 'outline'} 
-                    className="w-full py-8 flex flex-col items-center justify-center gap-2"
+                    variant={selectedSchedule?.status === 'conducted' ? "default" : "outline"} 
+                    className={`w-full py-8 flex flex-col items-center justify-center gap-2 rounded-lg transition-all
+                                ${selectedSchedule?.status === 'conducted' 
+                                  ? 'bg-green-500/80 text-white hover:bg-green-600/90 shadow-md ring-2 ring-green-500/50' 
+                                  : 'bg-slate-500/20 text-slate-700 hover:bg-slate-500/30 border-slate-400/50'}`}
                     onClick={() => handleScheduleStatusUpdate('conducted')}
                   >
-                    <svg 
-                      xmlns="http://www.w3.org/2000/svg" 
-                      className="h-8 w-8" 
-                      viewBox="0 0 20 20" 
-                      fill="currentColor"
-                    >
-                      <path 
-                        fillRule="evenodd" 
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" 
-                        clipRule="evenodd" 
-                      />
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
                     <span>Проведен</span>
                   </Button>
                 </div>
                 
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-slate-600">
                   Статус урока влияет на возможность выставления оценок.
                   Оценки можно ставить только для проведенных уроков.
                 </p>
                 
-                {/* Check if the current time is before the lesson time */}
                 {selectedSchedule && new Date() < new Date(`${selectedSchedule.scheduleDate}T${selectedSchedule.endTime}`) && (
                   <>
-                    <Alert variant="destructive">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertTitle>Внимание</AlertTitle>
+                    <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-700 rounded-lg">
+                      <AlertCircle className="h-4 w-4 text-red-600" />
+                      <AlertTitle className="font-semibold">Внимание</AlertTitle>
                       <AlertDescription>
                         Урок еще не завершился. Отметить урок как проведенный можно только после его окончания.
                       </AlertDescription>
                     </Alert>
                     
-                    {/* Кнопка для добавления запланированного задания для будущего урока */}
                     {classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && (
                       <div className="mt-4">
-                        <Alert className="bg-amber-50 border-amber-200">
+                        <Alert className="bg-amber-500/10 border-amber-500/30 text-amber-700 rounded-lg">
                           <CalendarIcon className="h-4 w-4 text-amber-600" />
-                          <AlertTitle className="text-amber-700">Запланировать задание</AlertTitle>
-                          <AlertDescription className="text-amber-700">
+                          <AlertTitle className="font-semibold">Запланировать задание</AlertTitle>
+                          <AlertDescription>
                             Вы можете запланировать задание к этому уроку заранее. Запланированные задания не влияют на среднюю оценку до проведения урока.
                           </AlertDescription>
                         </Alert>
                         
                         <Button 
                           variant="outline" 
-                          className="w-full mt-2 text-amber-600 border-amber-300 hover:bg-amber-50 hover:text-amber-700"
+                          className="w-full mt-2 text-amber-700 border-amber-500/50 hover:bg-amber-500/20 hover:text-amber-800 rounded-md"
                           onClick={() => {
                             setIsStatusDialogOpen(false);
-                            // Автоматически устанавливаем флаг plannedFor для заданий будущих уроков
                             if (selectedSchedule) {
-                              // Пре-заполняем форму для запланированного задания
                               assignmentForm.reset({
                                 assignmentType: AssignmentTypeEnum.HOMEWORK,
                                 maxScore: "10",
@@ -2233,7 +2161,7 @@ export default function ClassGradeDetailsPage() {
                                 classId: classId,
                                 teacherId: user?.id || 0,
                                 subgroupId: subgroupId || null,
-                                plannedFor: true // Автоматически помечаем как запланированное
+                                plannedFor: true 
                               });
                               setSelectedSchedule(selectedSchedule);
                               setIsAssignmentDialogOpen(true);
@@ -2250,10 +2178,11 @@ export default function ClassGradeDetailsPage() {
               </div>
             </div>
             
-            <DialogFooter>
+            <DialogFooter className="bg-transparent pt-4">
               <Button 
-                variant="outline" 
+                variant="ghost" 
                 onClick={() => setIsStatusDialogOpen(false)}
+                className="bg-slate-500/20 text-slate-700 hover:bg-slate-500/30 focus:ring-2 focus:ring-slate-500/50 rounded-md"
               >
                 Закрыть
               </Button>

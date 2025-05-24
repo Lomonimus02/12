@@ -42,13 +42,14 @@ export function SubgroupFormDialog({
   onSubmit,
   isLoading,
   classes,
-  subjects,
-  defaultValues // Destructure defaultValues
+  subjects, // This prop is kept for potential future use but isn't directly used in the form logic now
+  defaultValues
 }: SubgroupFormDialogProps) {
-  const isEditMode = !!defaultValues;
+  const isEditMode = !!defaultValues?.id; // More reliable check for edit mode
   const { toast } = useToast();
 
-  const [selectedClassId, setSelectedClassId] = useState<string>(defaultValues?.classId || "");
+  // selectedClassId state is largely managed by the form's classId field now.
+  // const [selectedClassId, setSelectedClassId] = useState<string>(defaultValues?.classId || "");
   const [students, setStudents] = useState<any[]>([]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
   const [isLoadingSubgroupStudents, setIsLoadingSubgroupStudents] = useState(false);
@@ -74,41 +75,44 @@ export function SubgroupFormDialog({
         studentIds: [],
       };
       form.reset(initialValues);
-      setSelectedClassId(initialValues.classId || "");
-      // Clear previously loaded students on open/reset
-      setStudents([]); 
-      // Ensure studentIds in form matches defaultValues initially
+      // setSelectedClassId(initialValues.classId || ""); // No longer need separate selectedClassId state
+      setStudents([]);
       form.setValue('studentIds', initialValues.studentIds || []);
-    } 
-    // No explicit reset on close needed if reset on open is done correctly
+    }
   }, [isOpen, defaultValues, form]);
 
-  // Effect to load CLASS students when classId changes or is initially set
+  // Effect to load CLASS students when classId changes (from form) or is initially set
   useEffect(() => {
-    const classIdToLoad = form.getValues("classId");
-    if (classIdToLoad) {
+    const classIdFromForm = form.getValues("classId");
+    if (classIdFromForm) {
       setIsLoadingStudents(true);
-      // Fetch students of the selected CLASS for the selection list
-      fetch(`/api/students-by-class/${classIdToLoad}`) 
-        .then(res => res.ok ? res.json() : Promise.reject('Failed to load class students'))
-        .then(data => setStudents(data || [])) // Ensure data is an array
+      setStudents([]); // Clear previous students
+      // Fetch students of the selected CLASS
+      apiRequest(`/api/students-by-class/${classIdFromForm}`)
+        .then(async res => {
+          if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText || 'Failed to load class students');
+          }
+          return res.json();
+        })
+        .then(data => setStudents(Array.isArray(data) ? data : []))
         .catch((error) => {
             console.error("Error fetching class students:", error);
-            setStudents([]); 
-            toast({ title: "Ошибка", description: "Не удалось загрузить список учеников класса", variant: "destructive" });
-         })
+            toast({ title: "Ошибка загрузки", description: `Не удалось загрузить учеников для класса ID ${classIdFromForm}. ${error.message}`, variant: "destructive" });
+        })
         .finally(() => setIsLoadingStudents(false));
     } else {
-      setStudents([]);
+      setStudents([]); // Clear students if no class is selected
     }
-  }, [form.watch("classId"), toast]); 
+  // Watch form's classId field
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.watch("classId"), isOpen]); // Also depend on isOpen to re-fetch if dialog re-opens with same classId
 
-  // Effect to load SUBGROUP students when in EDIT mode
+  // Effect to load SUBGROUP's assigned students when in EDIT mode and dialog opens
   useEffect(() => {
-    // Run only in edit mode and when the dialog is open
     if (isEditMode && isOpen && defaultValues?.id) {
       const subgroupId = defaultValues.id;
-      console.log(`Edit mode detected for subgroup ID: ${subgroupId}. Fetching assigned students.`);
       setIsLoadingSubgroupStudents(true);
       apiRequest(`/api/student-subgroups?subgroupId=${subgroupId}`)
         .then(async (res) => {
@@ -119,36 +123,26 @@ export function SubgroupFormDialog({
           return res.json();
         })
         .then((studentLinks) => {
-          // Ensure studentLinks is an array before mapping
-          const fetchedStudentIds = Array.isArray(studentLinks) 
-            ? studentLinks.map((link: { studentId: number }) => link.studentId.toString()) 
+          const fetchedStudentIds = Array.isArray(studentLinks)
+            ? studentLinks.map((link: { studentId: number }) => link.studentId.toString())
             : [];
-          console.log(`Fetched student IDs for subgroup ${subgroupId}:`, fetchedStudentIds);
-          // Update the form field with the fetched student IDs
-          form.setValue('studentIds', fetchedStudentIds, { shouldValidate: true });
+          form.setValue('studentIds', fetchedStudentIds, { shouldValidate: true, shouldDirty: true });
         })
         .catch((error) => {
           console.error(`Error fetching students for subgroup ${subgroupId}:`, error);
-          toast({ title: "Ошибка", description: `Не удалось загрузить текущих учеников подгруппы: ${error.message}`, variant: "destructive" });
-          // Reset studentIds in form if fetch fails?
-          // form.setValue('studentIds', defaultValues?.studentIds || []); 
+          toast({ title: "Ошибка загрузки", description: `Не удалось загрузить назначенных учеников для подгруппы. ${error.message}`, variant: "destructive" });
         })
         .finally(() => setIsLoadingSubgroupStudents(false));
     }
-  // Depend on isOpen and defaultValues.id to trigger when dialog opens in edit mode
-  }, [isOpen, isEditMode, defaultValues?.id, form, toast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, isEditMode, defaultValues?.id]); // form and toast are stable, not needed in deps
+
 
   const handleClose = () => {
-    // Reset form state explicitly before calling parent onClose
-    form.reset({
-      name: "",
-      description: "",
-      classId: "",
-      studentIds: [],
-    });
-    setSelectedClassId("");
+    form.reset({ name: "", description: "", classId: "", studentIds: [] });
+    // setSelectedClassId(""); // No longer needed
     setStudents([]);
-    onClose(); // Call parent handler
+    onClose();
   };
 
   const handleFormSubmit = (values: SubgroupFormData) => {
@@ -163,44 +157,76 @@ export function SubgroupFormDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          {/* Change title based on mode */}
-          <DialogTitle>{isEditMode ? "Редактировать подгруппу" : "Добавить подгруппу"}</DialogTitle>
-          <DialogDescription>
+      <DialogContent 
+        className="sm:max-w-[480px] p-6 bg-slate-200/15 backdrop-filter backdrop-blur-2xl rounded-3xl shadow-[0_25px_50px_-12px_rgba(0,0,0,0.18),_0_15px_30px_-20px_rgba(0,0,0,0.12)] border border-white/20
+                   data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-90 data-[state=open]:slide-in-from-bottom-10 
+                   sm:data-[state=open]:zoom-in-95 sm:data-[state=open]:slide-in-from-bottom-0 
+                   data-[state=open]:duration-400 data-[state=open]:ease-out 
+                   data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=closed]:slide-out-to-bottom-10 
+                   data-[state=closed]:duration-300 data-[state=closed]:ease-in"
+      >
+        <DialogHeader className="text-center"> {/* p-6 on content handles padding */}
+          <DialogTitle className="text-slate-800 text-xl font-semibold">
+            {isEditMode ? "Редактировать подгруппу" : "Новая подгруппа"}
+          </DialogTitle>
+          <DialogDescription className="text-slate-600">
             {isEditMode
-              ? "Измените информацию о подгруппе."
-              : "Введите информацию о новой подгруппе."
-            }
+              ? "Измените данные подгруппы ниже."
+              : "Заполните информацию о новой подгруппе."}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4 py-4">
+          <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6 py-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-slate-700 font-medium">Название подгруппы*</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Например: Группа А (Информатика)"
+                      {...field}
+                      className="w-full rounded-xl px-4 py-3 text-base font-medium bg-slate-100/20 backdrop-filter backdrop-blur-md border border-white/20 text-slate-900 placeholder:text-slate-500/90 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1),inset_0_-1px_2px_0_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/50 focus-visible:border-blue-500/70 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-100 transition-all duration-200 ease-in-out"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="classId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Класс</FormLabel>
+                  <FormLabel className="text-slate-700 font-medium">Класс*</FormLabel>
                   <Select
                     value={field.value}
                     onValueChange={value => {
                       field.onChange(value);
-                      // No need to manually call setSelectedClassId here, useEffect will handle it
-                      form.setValue("studentIds", []); // Reset students when class changes
+                      form.setValue("studentIds", []);
                     }}
+                    disabled={classes.length === 0 && !isLoading}
                   >
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger 
+                        className="w-full rounded-xl px-4 py-3 text-base font-medium bg-slate-100/20 backdrop-filter backdrop-blur-md border border-white/20 text-slate-900 placeholder:text-slate-500/90 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1),inset_0_-1px_2px_0_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/50 focus-visible:border-blue-500/70 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-100 transition-all duration-200 ease-in-out [&>svg]:text-slate-700"
+                      >
                         <SelectValue placeholder="Выберите класс" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
-                      {classes.length === 0 ? (
-                        <SelectItem value="loading" disabled>Загрузка...</SelectItem>
+                    <SelectContent className="bg-white/60 backdrop-filter backdrop-blur-lg rounded-xl shadow-xl border border-white/20">
+                      {isLoading && classes.length === 0 ? (
+                        <SelectItem value="loading_classes" disabled className="text-slate-800 relative flex w-full cursor-default select-none items-center rounded-md py-2.5 pl-8 pr-3 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-blue-500/10 data-[highlighted]:text-accent-foreground focus:bg-blue-500/10 focus:text-accent-foreground">Загрузка классов...</SelectItem>
+                      ) : classes.length === 0 ? (
+                        <SelectItem value="no_classes" disabled className="text-slate-800 relative flex w-full cursor-default select-none items-center rounded-md py-2.5 pl-8 pr-3 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-blue-500/10 data-[highlighted]:text-accent-foreground focus:bg-blue-500/10 focus:text-accent-foreground">Нет доступных классов</SelectItem>
                       ) : (
                         classes.map((cls) => (
-                          <SelectItem key={cls.id} value={cls.id.toString()}>
+                          <SelectItem
+                            key={cls.id}
+                            value={cls.id.toString()}
+                            className="text-slate-800 relative flex w-full cursor-default select-none items-center rounded-md py-2.5 pl-8 pr-3 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-blue-500/10 data-[highlighted]:text-accent-foreground focus:bg-blue-500/10 focus:text-accent-foreground"
+                          >
                             {cls.name}
                           </SelectItem>
                         ))
@@ -213,59 +239,28 @@ export function SubgroupFormDialog({
             />
             <FormField
               control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Название подгруппы</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Например: Группа 1 (Англ. язык)" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Описание (необязательно)</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Краткое описание подгруппы"
-                      {...field}
-                      value={field.value || ""} // Handle null value
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
               name="studentIds"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Ученики</FormLabel>
-                  {/* Show loading indicator for class students OR subgroup students */}
-                  {(isLoadingStudents || isLoadingSubgroupStudents) ? (
-                    <div className="flex items-center text-muted-foreground">
-                         <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Загрузка учеников...
+                  <FormLabel className="text-slate-700 font-medium">Ученики</FormLabel>
+                  { isLoadingStudents || isLoadingSubgroupStudents ? (
+                    <div className="flex items-center text-sm text-slate-600 py-2">
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {isLoadingSubgroupStudents ? "Загрузка назначенных учеников..." : "Загрузка учеников класса..."}
                     </div>
-                  ) : students.length === 0 && form.getValues("classId") ? (
-                    <div className="text-muted-foreground">Нет учеников в выбранном классе</div>
                   ) : !form.getValues("classId") ? (
-                     <div className="text-muted-foreground">Выберите класс, чтобы увидеть учеников</div>
+                    <div className="text-sm text-slate-600 py-2">Сначала выберите класс.</div>
+                  ) : students.length === 0 ? (
+                    <div className="text-sm text-slate-600 py-2">В выбранном классе нет учеников.</div>
                   ) : (
-                    <div className="flex flex-col gap-2 max-h-40 overflow-y-auto border rounded p-2">
-                      {/* Display the list of students FROM THE CLASS */}
+                    <div className="flex flex-col gap-1 max-h-52 overflow-y-auto rounded-xl bg-slate-100/20 backdrop-filter backdrop-blur-md border border-white/20 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1),inset_0_-1px_2px_0_rgba(0,0,0,0.08)] p-3">
                       {students.map((student) => (
-                        <label key={student.id} className="flex items-center space-x-2">
+                        <label key={student.id} className="flex items-center space-x-3 p-2.5 rounded-lg hover:bg-slate-200/40 transition-colors cursor-pointer text-slate-800">
                           <input
                             type="checkbox"
-                            value={student.id.toString()} 
-                            // Checkbox state is controlled by the form field value (field.value)
-                            checked={field.value?.includes(student.id.toString())} 
+                            className="form-checkbox h-5 w-5 rounded-md border-slate-400/70 bg-white/30 text-blue-600 shadow-sm focus:ring-2 focus:ring-blue-500/70 focus:ring-offset-0 focus:ring-offset-slate-100"
+                            value={student.id.toString()}
+                            checked={field.value?.includes(student.id.toString())}
                             onChange={e => {
                               const studentIdStr = student.id.toString();
                               const currentIds = field.value || [];
@@ -275,31 +270,59 @@ export function SubgroupFormDialog({
                                 field.onChange(currentIds.filter((id: string) => id !== studentIdStr));
                               }
                             }}
-                            // Disable checkbox if still loading subgroup assignments
-                            disabled={isLoadingSubgroupStudents} 
+                            disabled={isLoadingSubgroupStudents}
                           />
-                          <span>{student.lastName} {student.firstName}</span>
+                          <span>{student.lastName} {student.firstName} {student.middleName || ''}</span>
                         </label>
                       ))}
                     </div>
                   )}
-                  <FormDescription>
-                      {isLoadingSubgroupStudents 
-                        ? "Загрузка назначенных учеников..." 
-                        : "Выберите учеников для этой подгруппы."} 
+                  <FormDescription className="text-slate-600 text-xs"> {/* Adjusted description text */}
+                    {isLoadingSubgroupStudents
+                      ? "Обновление списка назначенных учеников..."
+                      : "Выберите учеников для этой подгруппы."}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={handleClose} disabled={isLoading}>
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-slate-700 font-medium">Описание</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Дополнительная информация о подгруппе (например, уровень сложности, преподаватель)"
+                      {...field}
+                      value={field.value || ""}
+                      className="w-full rounded-xl px-4 py-3 text-base font-medium bg-slate-100/20 backdrop-filter backdrop-blur-md border border-white/20 text-slate-900 placeholder:text-slate-500/90 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1),inset_0_-1px_2px_0_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/50 focus-visible:border-blue-500/70 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-100 transition-all duration-200 ease-in-out min-h-[100px]"
+                    />
+                  </FormControl>
+                  <FormDescription className="text-slate-600 text-xs">
+                    Это поле не обязательно.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <DialogFooter className="pt-6 gap-3"> {/* Removed bg-transparent, added gap */}
+              <Button
+                type="button"
+                onClick={handleClose}
+                disabled={isLoading || isLoadingSubgroupStudents || isLoadingStudents}
+                className="inline-flex items-center justify-center rounded-full px-6 py-3 text-base font-medium bg-white/15 backdrop-filter backdrop-blur-lg text-slate-800 shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.45),inset_0_1px_2px_rgba(0,0,0,0.05),0_15px_30px_-8px_rgba(0,0,0,0.08),_0_8px_20px_-12px_rgba(0,0,0,0.05)] hover:bg-white/25 hover:shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.55),inset_0_1px_2px_rgba(0,0,0,0.08),0_18px_35px_-8px_rgba(0,0,0,0.1),0_10px_25px_-12px_rgba(0,0,0,0.07)] hover:-translate-y-px active:scale-[0.98] active:bg-white/20 active:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.3),inset_0_1px_3px_rgba(0,0,0,0.1)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 transition-all duration-200 ease-in-out"
+              >
                 Отмена
               </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {/* Change button text based on mode */}
-                {isEditMode ? "Сохранить изменения" : "Создать подгруппу"}
+              <Button
+                type="submit"
+                disabled={isLoading || isLoadingSubgroupStudents || isLoadingStudents}
+                className="inline-flex items-center justify-center rounded-full px-6 py-3 text-base font-medium text-white bg-gradient-to-b from-blue-500/95 via-blue-600/90 to-blue-700/95 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),inset_0_0_0_1.5px_rgba(255,255,255,0.2),0_5px_15px_-3px_rgba(0,0,0,0.08),_0_8px_25px_-8px_rgba(0,0,0,0.07)] hover:from-blue-400/95 hover:via-blue-500/90 hover:to-blue-600/95 hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.5),inset_0_0_0_1.5px_rgba(255,255,255,0.3),0_6px_18px_-3px_rgba(0,0,0,0.1),0_10px_30px_-8px_rgba(0,0,0,0.09)] hover:-translate-y-px active:scale-[0.97] active:from-blue-600/95 active:via-blue-700/90 active:to-blue-800/95 active:shadow-[inset_0_1px_3px_rgba(0,0,0,0.25)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 transition-all duration-200 ease-in-out"
+              >
+                {(isLoading || isLoadingSubgroupStudents) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isEditMode ? "Сохранить" : "Создать подгруппу"}
               </Button>
             </DialogFooter>
           </form>
